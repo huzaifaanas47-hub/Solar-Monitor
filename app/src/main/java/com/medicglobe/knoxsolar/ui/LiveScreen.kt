@@ -22,7 +22,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medicglobe.knoxsolar.AppViewModel
-import com.medicglobe.knoxsolar.BuildConfig
 import com.medicglobe.knoxsolar.Today
 import com.medicglobe.knoxsolar.f0
 import com.medicglobe.knoxsolar.f1
@@ -201,7 +200,6 @@ fun LiveScreen(vm: AppViewModel) {
             KV("Peak load today", "${f2(t.peakLoad)} kW")
             KV("Lowest battery today", "${f0(t.minSoc)}%")
             t.updatedAt?.let { KV("Last saved", it) }
-            KV("App version", BuildConfig.VERSION_NAME)
         }
         Box(Modifier.padding(bottom = 8.dp))
     }

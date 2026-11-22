@@ -37,8 +37,6 @@ class FlowState(t: Today) {
     val battKw = t.battKw
     val soc = t.soc
     val gridUp = t.gridUp != 0
-    val gridV = t.gridV
-    val gridHz = t.gridHz
     val outageSec = t.outageSec
 
     val solarOn = pv > 0.05
@@ -103,12 +101,8 @@ private class Node(
 fun FlowDiagram(f: FlowState, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer(cacheSize = 64)
     val time by produceState(0f) {
-        var start = -1L
         while (true) {
-            withFrameNanos { n ->
-                if (start < 0L) start = n
-                value = ((n - start) / 1_000_000L).toFloat() / 1000f
-            }
+            withFrameNanos { value = (it / 1_000_000L).toFloat() / 1000f }
         }
     }
 
@@ -225,16 +219,6 @@ fun FlowDiagram(f: FlowState, modifier: Modifier = Modifier) {
             txt(n.value, n.cx, n.cy + 2f, 13.5f, n.valueColor, bold = true)
             txt(n.sub, n.cx, n.cy + 17f, 6.5f, Color.White.copy(alpha = 0.38f), mono = true)
             txt(n.emoji, n.cx + 29f, n.cy - 21f, 10f, Color.White.copy(alpha = 0.7f))
-        }
-
-        // ── grid voltage / frequency under the GRID node ──
-        val gridNote = when {
-            f.gridV > 1.0 -> f0(f.gridV) + " V" + (if (f.gridHz > 1.0) " · " + f0(f.gridHz) + " Hz" else "")
-            !f.gridUp -> "no supply"
-            else -> ""
-        }
-        if (gridNote.isNotEmpty()) {
-            txt(gridNote, 330f, 126f, 8f, if (f.gridUp) GRID_RGB else KC.bad, bold = true, mono = true)
         }
     }
 }
