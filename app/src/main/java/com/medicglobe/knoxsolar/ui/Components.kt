@@ -2,6 +2,9 @@ package com.medicglobe.knoxsolar.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,15 +34,21 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun KCard(title: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
     Column(
         modifier
             .fillMaxWidth()
-            .background(KC.s1, RoundedCornerShape(16.dp))
+            .clip(shape)
+            .background(KC.glass)
+            .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
             .padding(16.dp)
     ) {
         if (title != null) {
-            Text(title, color = KC.mute, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Box(Modifier.height(10.dp))
+            Text(
+                title.uppercase(), color = KC.mute, fontSize = 10.sp, letterSpacing = 2.sp,
+                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
+            )
+            Box(Modifier.height(12.dp))
         }
         content()
     }

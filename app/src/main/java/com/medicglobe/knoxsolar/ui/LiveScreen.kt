@@ -1,5 +1,7 @@
 package com.medicglobe.knoxsolar.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,12 +9,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medicglobe.knoxsolar.AppViewModel
@@ -27,7 +33,7 @@ import kotlin.math.abs
 fun LiveScreen(vm: AppViewModel) {
     val t = vm.today
     Column(
-        Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         vm.todayError?.let { Note(it, KC.warn) }
@@ -35,8 +41,9 @@ fun LiveScreen(vm: AppViewModel) {
             if (vm.todayError == null) Note("Loading…")
             return@Column
         }
+        val f = FlowState(t)
 
-        // ── Status line ──
+        // ── Status row ──
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             when (t.gridUp) {
                 1 -> Pill("Grid UP", KC.ok)
@@ -44,93 +51,174 @@ fun LiveScreen(vm: AppViewModel) {
                 else -> Pill("Grid unknown", KC.mute)
             }
             val g = vm.guard
-            if (g != null) {
-                if (g.ok) Pill("Logging OK", KC.ok)
-                else Pill("Logging stuck", KC.bad)
-            }
+            if (g != null) Pill(if (g.ok) "Logging OK" else "Logging stuck", if (g.ok) KC.ok else KC.bad)
         }
         if (t.outageSince != null) {
-            KCard {
+            AccentCard(KC.bad, Modifier.fillMaxWidth()) {
                 Text("Grid outage in progress", color = KC.bad, fontWeight = FontWeight.SemiBold)
-                Note("Since ${t.outageSince}" + if (t.outageSec > 0) " (${fmtDur(t.outageSec)})" else "")
+                MonoSub("Since ${t.outageSince}" + if (t.outageSec > 0) " (${fmtDur(t.outageSec)})" else "")
             }
         }
 
-        // ── Battery ──
-        val socColor = when {
-            t.soc > 50 -> KC.ok
-            t.soc > 20 -> KC.warn
-            else -> KC.bad
+        // ── Hero strip: Solar / Load / Battery now ──
+        val solarOn = f.solarOn
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            HeroTile("☀️", "Solar now", f2(t.pv), "kW", KC.solar,
+                if (solarOn) "${f0(t.pv * 1000)} W output" else "Solar offline", Modifier.weight(1f))
+            HeroTile("🏠", "Load now", f2(t.load), "kW", KC.load,
+                when {
+                    !f.gridUp -> "⛔ Grid down"
+                    f.importing && !f.battDisch -> "Grid +${f2(f.gridAbs)} kW"
+                    f.battDisch -> "Battery ${f2(f.battKw)} kW"
+                    f.exporting -> "Exporting"
+                    else -> "Solar = Load"
+                }, Modifier.weight(1f))
+            HeroTile("🔋", "Battery", f0(t.soc), "%", KC.sell,
+                (if (t.soc >= 80) "↑ High" else if (t.soc >= 40) "→ Mid" else "↓ Low") +
+                    (if (t.battV > 10) " · ${f1(t.battV)}V" else ""), Modifier.weight(1f))
         }
-        KCard("BATTERY") {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                SocRing(t.soc, socColor)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${f0(t.soc)}%", color = KC.text, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        when {
-                            t.battKw > 0.02 -> "Discharging ${f2(t.battKw)} kW"
-                            t.battKw < -0.02 -> "Charging ${f2(-t.battKw)} kW"
-                            else -> "Idle"
-                        },
-                        color = KC.mute, fontSize = 13.sp,
-                    )
+
+        // ── Live energy flow ──
+        KCard("Live energy flow") {
+            FlowDiagram(f)
+            Box(
+                Modifier.fillMaxWidth().padding(top = 12.dp)
+                    .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(f.statusLine(), color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, lineHeight = 18.sp)
+            }
+            Box(Modifier.padding(top = 16.dp)) {
+                Column {
+                    MonoLabel("Battery charge level")
+                    Box(Modifier.padding(top = 8.dp)) { BattBar(t.soc) }
                 }
             }
         }
 
-        // ── Power now ──
-        KCard("POWER NOW") {
-            StatRow {
-                Stat("Solar", f2(t.pv), Modifier.weight(1f), KC.solar, "kW")
-                Stat("Load", f2(t.load), Modifier.weight(1f), KC.load, "kW")
-            }
-            StatRow {
-                val gridLabel = when {
-                    t.gridUp == 0 -> "Grid (down)"
-                    t.grid > 0.01 -> "Grid import"
-                    t.grid < -0.01 -> "Grid export"
-                    else -> "Grid"
+        // ── KPI tiles ──
+        val selfKwh = minOf(t.gen, t.used)
+        val selfPct = if (t.gen + t.buy > 0) Math.round(t.gen / (t.gen + t.buy) * 100.0).toInt() else 0
+        val net = t.gen - t.used
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KpiTile("Generated", f2(t.gen), "kWh", KC.solar, "Lifetime: ${f1(t.total)} kWh", Modifier.weight(1f))
+            KpiTile("Consumed", f2(t.used), "kWh", KC.load, "Live: ${f2(t.load)} kW", Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KpiTile("Grid bought", f2(t.buy), "kWh", KC.grid,
+                when {
+                    !f.gridUp -> "⛔ Grid down"
+                    f.importing && !f.battDisch -> "Now: ${f2(f.gridAbs)} kW"
+                    else -> "Self-sufficient"
+                }, Modifier.weight(1f))
+            KpiTile("Sent to grid", f2(t.sell), "kWh", KC.sell, "Exported today", Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KpiTile("Grid cost", f0(t.costGrid), "Rs", KC.bad, "${f2(t.buy)} kWh bought", Modifier.weight(1f))
+            KpiTile("Solar saved", f0(t.savings), "Rs", KC.ok, "${f2(t.gen)} kWh generated", Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KpiTile("Self-sufficiency", selfPct.toString(), "%", KC.ok, "Solar share of supply", Modifier.weight(1f))
+            KpiTile("Net today", (if (net >= 0) "+" else "−") + f2(abs(net)), "kWh",
+                if (net >= 0) KC.ok else KC.bad, "Generated − consumed", Modifier.weight(1f))
+        }
+
+        // ── Self-sufficiency donut + efficiency ──
+        val eff = minOf(
+            100,
+            Math.round(selfPct * 0.6 + (if (t.soc > 30) 20 else 0) + (if (t.sell > 0) 10 else 0) + (if (t.buy < 1) 10 else 0)).toInt(),
+        )
+        KCard("Energy sources today") {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(contentAlignment = Alignment.Center) {
+                    Donut(selfPct.toDouble(), KC.solar, KC.grid)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("$selfPct%", color = KC.solar, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                        MonoLabel("solar")
+                    }
                 }
-                Stat(gridLabel, f2(abs(t.grid)), Modifier.weight(1f), KC.grid, "kW")
-                Stat("Inverter temp", f0(t.temp), Modifier.weight(1f), KC.text, "°C")
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LegendRow("Solar generated", "${f2(t.gen)} kWh", KC.solar)
+                    LegendRow("Home used", "${f2(t.used)} kWh", KC.load)
+                    LegendRow("Grid bought", "${f2(t.buy)} kWh", KC.grid)
+                    LegendRow("Sent to grid", "${f2(t.sell)} kWh", KC.sell)
+                    LegendRow("Self-used solar", "${f2(selfKwh)} kWh", KC.ok)
+                }
+            }
+        }
+        KCard("Efficiency score") {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(contentAlignment = Alignment.Center) {
+                    ScoreRing(eff.toDouble(), if (eff >= 70) KC.ok else if (eff >= 40) KC.warn else KC.bad)
+                    Text("$eff", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = KC.text)
+                }
+                Column(Modifier.weight(1f)) {
+                    KV("Self-sufficiency", "$selfPct%")
+                    KV("Grid share", "${100 - selfPct}%")
+                    KV("Battery", "${f0(t.soc)}%")
+                    KV("Peak solar", "${f1(t.peakPv)} kW")
+                }
             }
         }
 
-        // ── Energy today ──
-        KCard("TODAY") {
-            StatRow {
-                Stat("Generated", f2(t.gen), Modifier.weight(1f), KC.solar, "kWh")
-                Stat("Consumed", f2(t.used), Modifier.weight(1f), KC.load, "kWh")
-            }
-            StatRow {
-                Stat("Bought", f2(t.buy), Modifier.weight(1f), KC.grid, "kWh")
-                Stat("Sold", f2(t.sell), Modifier.weight(1f), KC.ok, "kWh")
-            }
-        }
-
-        // ── Money & CO2 ──
-        KCard("VALUE TODAY") {
-            StatRow {
-                Stat("Solar saved", f0(t.savings), Modifier.weight(1f), KC.ok, "Rs")
-                Stat("Grid cost", f0(t.costGrid), Modifier.weight(1f), KC.bad, "Rs")
-            }
+        // ── Value + details ──
+        KCard("Value today") {
             StatRow {
                 Stat("Export revenue", f0(t.revenue), Modifier.weight(1f), KC.ok, "Rs")
                 Stat("CO₂ avoided", f1(t.co2), Modifier.weight(1f), KC.text, "kg")
             }
         }
-
-        // ── Details ──
-        KCard("DETAILS") {
+        KCard("Details") {
             KV("Solar panels", "${f0(t.pvV)} V · ${f1(t.pvA)} A")
             KV("Battery voltage", "${f1(t.battV)} V")
             KV("Grid", if (t.gridUp == 0) "no supply" else "${f0(t.gridV)} V · ${f1(t.gridHz)} Hz")
-            KV("Peak solar today", "${f2(t.peakPv)} kW")
+            KV("Inverter temperature", "${f0(t.temp)} °C")
             KV("Peak load today", "${f2(t.peakLoad)} kW")
             KV("Lowest battery today", "${f0(t.minSoc)}%")
-            KV("Lifetime generation", "${f0(t.total)} kWh")
             t.updatedAt?.let { KV("Last saved", it) }
         }
+        Box(Modifier.padding(bottom = 8.dp))
+    }
+}
+
+@Composable
+private fun HeroTile(icon: String, label: String, value: String, unit: String, accent: Color, sub: String, modifier: Modifier) {
+    AccentCard(accent, modifier) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(icon, fontSize = 20.sp)
+            Box(Modifier.padding(top = 4.dp))
+            MonoLabel(label)
+            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
+                Text(value, color = accent, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                Text(" $unit", color = KC.mute, fontSize = 11.sp, modifier = Modifier.padding(bottom = 3.dp))
+            }
+            Text(sub, color = KC.mute2, fontSize = 9.sp, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, lineHeight = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun KpiTile(label: String, value: String, unit: String, accent: Color, sub: String, modifier: Modifier) {
+    AccentCard(accent, modifier) {
+        MonoLabel(label)
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 6.dp)) {
+            Text(value, color = accent, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Text(" $unit", color = KC.mute, fontSize = 11.sp, modifier = Modifier.padding(bottom = 3.dp))
+        }
+        MonoSub(sub)
+    }
+}
+
+@Composable
+private fun LegendRow(label: String, value: String, dot: Color) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.padding(end = 8.dp).background(dot, RoundedCornerShape(50)).padding(4.dp))
+            Text(label, color = KC.mute, fontSize = 12.sp)
+        }
+        Text(value, color = KC.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }

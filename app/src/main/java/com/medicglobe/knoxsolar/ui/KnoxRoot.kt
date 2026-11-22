@@ -1,6 +1,11 @@
 package com.medicglobe.knoxsolar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,24 +60,45 @@ fun KnoxRoot(vm: AppViewModel, tab: Int, onTab: (Int) -> Unit) {
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = KC.acc, selectedTextColor = KC.acc,
                             unselectedIconColor = KC.mute, unselectedTextColor = KC.mute,
-                            indicatorColor = KC.s2,
+                            indicatorColor = KC.s3,
                         ),
                     )
                 }
             }
         },
     ) { pad ->
-        Box(Modifier.fillMaxSize().background(KC.bg).padding(pad)) {
+        Box(
+            Modifier.fillMaxSize().background(KC.bg)
+                .drawBehind {
+                    drawCircle(
+                        Brush.radialGradient(
+                            listOf(KC.acc.copy(alpha = 0.10f), Color.Transparent),
+                            center = Offset(0f, 0f), radius = size.width * 0.9f,
+                        ),
+                        radius = size.width * 0.9f, center = Offset(0f, 0f),
+                    )
+                    drawCircle(
+                        Brush.radialGradient(
+                            listOf(KC.grid.copy(alpha = 0.07f), Color.Transparent),
+                            center = Offset(size.width, size.height), radius = size.width * 0.8f,
+                        ),
+                        radius = size.width * 0.8f, center = Offset(size.width, size.height),
+                    )
+                }
+                .padding(pad)
+        ) {
             Column(Modifier.fillMaxSize()) {
                 Row(
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        "Knox Solar · " + TABS[tab].title, color = KC.acc,
-                        fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Column(Modifier.weight(1f)) {
+                        Text("Knox Solar", color = KC.acc, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            TABS[tab].title.uppercase() + " · ADVANCED ENERGY COMMAND",
+                            color = KC.mute2, fontSize = 9.sp, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace,
+                        )
+                    }
                     IconButton(onClick = {
                         vm.refreshLive()
                         when (tab) {
