@@ -29,9 +29,28 @@ import com.medicglobe.knoxsolar.f2
 import com.medicglobe.knoxsolar.fmtDur
 import kotlin.math.abs
 
+/**
+ * The cron worker stores the inverter's raw grid reading, which is 0 whenever the grid is
+ * simply feeding the house. The web dashboard works out the real flow from load / solar / battery
+ * (buildFromDbRow in index.html). Do the same here so the flow diagram has something to animate.
+ */
+private fun withDerivedFlow(t: Today): Today {
+    var grid = t.grid
+    var batt = t.battKw
+    if (t.gridUp == 0) {
+        grid = 0.0                                   // grid down: nothing is imported or exported
+        val deficit = t.load - t.pv
+        if (deficit > 0.05 && batt < deficit - 0.05) batt = deficit   // the battery covers the rest
+    } else if (abs(grid) < 0.01) {
+        grid = t.load - t.pv - maxOf(0.0, batt)      // whatever solar + battery don't cover is grid import
+        if (abs(grid) < 0.05) grid = 0.0
+    }
+    return t.copy(grid = grid, battKw = batt)
+}
+
 @Composable
 fun LiveScreen(vm: AppViewModel) {
-    val t = vm.today
+    val t = vm.today?.let { withDerivedFlow(it) }
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -45,10 +64,11 @@ fun LiveScreen(vm: AppViewModel) {
 
         // ── Status row ──
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            val gv = if (t.gridV > 1.0) " · ${f0(t.gridV)} V" else if (t.gridHz > 1.0) " · ${f1(t.gridHz)} Hz" else ""
             when (t.gridUp) {
-                1 -> Pill("Grid UP", KC.ok)
-                0 -> Pill("Grid DOWN", KC.bad)
-                else -> Pill("Grid unknown", KC.mute)
+                1 -> Pill("Grid UP$gv", KC.ok)
+                0 -> Pill("Grid DOWN$gv", KC.bad)
+                else -> Pill("Grid unknown$gv", KC.mute)
             }
             val g = vm.guard
             if (g != null) Pill(if (g.ok) "Logging OK" else "Logging stuck", if (g.ok) KC.ok else KC.bad)
@@ -174,7 +194,8 @@ fun LiveScreen(vm: AppViewModel) {
         KCard("Details") {
             KV("Solar panels", "${f0(t.pvV)} V · ${f1(t.pvA)} A")
             KV("Battery voltage", "${f1(t.battV)} V")
-            KV("Grid", if (t.gridUp == 0) "no supply" else "${f0(t.gridV)} V · ${f1(t.gridHz)} Hz")
+            KV("Grid voltage", if (t.gridV > 1.0) "${f1(t.gridV)} V" else if (t.gridUp == 0) "no supply" else "not reported")
+            KV("Grid frequency", if (t.gridHz > 1.0) "${f1(t.gridHz)} Hz" else "not reported")
             KV("Inverter temperature", "${f0(t.temp)} °C")
             KV("Peak load today", "${f2(t.peakLoad)} kW")
             KV("Lowest battery today", "${f0(t.minSoc)}%")
