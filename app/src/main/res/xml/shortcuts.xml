@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="inverter_settings"
+        android:enabled="true"
+        android:icon="@drawable/ic_settings"
+        android:shortcutShortLabel="@string/shortcut_settings"
+        android:shortcutLongLabel="@string/shortcut_settings_long">
+        <intent
+            android:action="com.medicglobe.knoxsolar.OPEN_SETTINGS"
+            android:targetClass="com.medicglobe.knoxsolar.MainActivity"
+            android:targetPackage="com.medicglobe.knoxsolar" />
+    </shortcut>
+</shortcuts>
