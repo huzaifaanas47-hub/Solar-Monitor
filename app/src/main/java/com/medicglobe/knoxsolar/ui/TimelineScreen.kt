@@ -1,0 +1,92 @@
+package com.medicglobe.knoxsolar.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.medicglobe.knoxsolar.AppViewModel
+import com.medicglobe.knoxsolar.f0
+import com.medicglobe.knoxsolar.f1
+import com.medicglobe.knoxsolar.f2
+import java.time.LocalDate
+import kotlin.math.abs
+import kotlin.math.ceil
+
+@Composable
+fun TimelineScreen(vm: AppViewModel) {
+    LaunchedEffect(Unit) { vm.loadTimeline() }
+    val pts = vm.points
+    val date = vm.tlDate
+
+    LazyColumn(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = { vm.loadTimeline(date.minusDays(1)) }) { Text("◀") }
+                Text(if (date == LocalDate.now()) "Today · $date" else date.toString(), color = KC.text)
+                OutlinedButton(onClick = { vm.loadTimeline(date.plusDays(1)) }, enabled = date.isBefore(LocalDate.now())) { Text("▶") }
+            }
+        }
+        vm.tlError?.let { err -> item { Note(err, KC.warn) } }
+        if (vm.tlLoading) item { Note("Loading…") }
+
+        if (pts.isNotEmpty()) {
+            val shaded = pts.filter { it.gridUp == 0 }.map { it.minute to it.minute + vm.tlIntervalMin }
+            item {
+                val maxKw = ceil(pts.maxOf { maxOf(it.pv, it.load, abs(it.grid)) }.coerceAtLeast(0.5)).toFloat()
+                val minKw = pts.minOf { it.grid }.coerceAtMost(0.0).let { if (it < 0) -ceil(-it).toFloat() else 0f }
+                KCard("POWER (kW)") {
+                    LineChart(
+                        listOf(
+                            Series("Solar", KC.solar, pts.map { it.minute to it.pv.toFloat() }),
+                            Series("Load", KC.load, pts.map { it.minute to it.load.toFloat() }),
+                            Series("Grid", KC.grid, pts.map { it.minute to it.grid.toFloat() }),
+                        ),
+                        yMin = minKw, yMax = maxKw, shaded = shaded,
+                    )
+                    HourAxis()
+                    Legend(listOf("Solar" to KC.solar, "Load" to KC.load, "Grid (+ import / − export)" to KC.grid))
+                    if (shaded.isNotEmpty()) Note("Red bands: grid down", KC.bad)
+                }
+            }
+            item {
+                KCard("BATTERY (%)") {
+                    LineChart(
+                        listOf(Series("Battery", KC.ok, pts.map { it.minute to it.soc.toFloat() })),
+                        yMin = 0f, yMax = 100f, shaded = shaded,
+                    )
+                    HourAxis()
+                }
+            }
+            items(pts.reversed()) { p ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(p.time, color = KC.text, fontSize = 13.sp)
+                    Text("☀ ${f2(p.pv)}", color = KC.solar, fontSize = 13.sp)
+                    Text("⌂ ${f2(p.load)}", color = KC.load, fontSize = 13.sp)
+                    Text("⚡ ${f2(p.grid)}", color = KC.grid, fontSize = 13.sp)
+                    Text("${f0(p.soc)}%", color = KC.ok, fontSize = 13.sp)
+                    Text(
+                        when (p.gridUp) { 1 -> "UP"; 0 -> "DOWN"; else -> "?" },
+                        color = if (p.gridUp == 0) KC.bad else KC.mute, fontSize = 13.sp,
+                    )
+                }
+            }
+        } else if (!vm.tlLoading && vm.tlError == null) {
+            item { Note("No readings for this day.") }
+        }
+        item { Note("") }
+    }
+}

@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Knox Solar</string>
-    <string name="offline_title">Cannot reach the server</string>
-    <string name="offline_msg">Check your internet connection and try again.</string>
-    <string name="retry">Retry</string>
-    <string name="shortcut_settings">Inverter settings</string>
-    <string name="shortcut_settings_long">Change inverter login</string>
+    <string name="shortcut_settings">Settings</string>
+    <string name="shortcut_settings_long">Open app settings</string>
 </resources>

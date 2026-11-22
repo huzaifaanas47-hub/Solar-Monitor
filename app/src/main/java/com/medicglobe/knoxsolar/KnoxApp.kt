@@ -16,9 +16,7 @@ class KnoxApp : Application() {
         // Every ~15 minutes (Android's minimum): wake the server's cron worker if it
         // stopped, and raise a notification on grid outage or if logging is stuck.
         val request = PeriodicWorkRequestBuilder<GuardWorker>(15, TimeUnit.MINUTES)
-            .setConstraints(
-                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-            )
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "knox-guard", ExistingPeriodicWorkPolicy.KEEP, request
