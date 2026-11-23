@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.medicglobe.knoxsolar.f0
 import java.util.Locale
 
-private val Tabular = TextStyle(fontFeatureSettings = "tnum")
+private val Tabular = TextStyle(fontFamily = KFont, fontFeatureSettings = "tnum")
 
 /** A value that eases to its new number instead of jumping. Digits keep a fixed width so the text does not wobble. */
 @Composable
@@ -60,25 +60,32 @@ fun easedFloat(target: Float, ms: Int = 800): Float {
     return v
 }
 
-/** Card with a coloured edge and a faint glow in the corner. */
+/** Bento tile: soft gradient surface, a hairline edge tinted by [accent], and a glow in the corner. */
 @Composable
-fun AccentCard(accent: Color, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
+fun AccentCard(
+    accent: Color, modifier: Modifier = Modifier, padding: Dp = 14.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(24.dp)
     Column(
         modifier
             .clip(shape)
-            .background(KC.glass)
-            .border(1.dp, accent.copy(alpha = 0.20f), shape)
+            .background(KC.cardBrush)
+            .border(
+                1.dp,
+                Brush.verticalGradient(listOf(accent.copy(alpha = 0.30f), Color.White.copy(alpha = 0.04f))),
+                shape,
+            )
             .drawBehind {
                 drawCircle(
                     brush = Brush.radialGradient(
-                        listOf(accent.copy(alpha = 0.14f), Color.Transparent),
-                        center = Offset(size.width, 0f), radius = size.width * 0.7f,
+                        listOf(accent.copy(alpha = 0.18f), Color.Transparent),
+                        center = Offset(size.width, 0f), radius = size.width * 0.85f,
                     ),
-                    radius = size.width * 0.7f, center = Offset(size.width, 0f),
+                    radius = size.width * 0.85f, center = Offset(size.width, 0f),
                 )
             }
-            .padding(14.dp),
+            .padding(padding),
         content = content,
     )
 }
@@ -105,7 +112,7 @@ fun BarRow(label: String, value: Double, unit: String, max: Double, color: Color
             Text(" $unit", color = KC.mute, fontSize = 12.sp, modifier = Modifier.padding(bottom = 1.dp))
         }
         Box(
-            Modifier.padding(top = 7.dp).fillMaxWidth().height(5.dp)
+            Modifier.padding(top = 8.dp).fillMaxWidth().height(6.dp)
                 .clip(RoundedCornerShape(3.dp)).background(KC.track)
         ) {
             Box(

@@ -46,8 +46,8 @@ import kotlin.math.sin
 private const val W = 400f
 private const val H = 350f
 
-private val SKY_TOP = Color(0xFF10263A)
-private val SKY_BOT = Color(0xFF0B1626)
+private val SKY_TOP = Color(0xFF14304C)
+private val SKY_BOT = Color(0xFF0A1424)
 private val WALL = Color(0xFF7FA6A0)
 private val WALL_SIDE = Color(0xFF668E89)
 private val PANEL = Color(0xFF14233B)
@@ -55,7 +55,7 @@ private val PANEL_LINE = Color(0xFF6C86A8)
 private val CABLE = Color(0xFF1E4A47)
 private val C_SOLAR = Color(0xFFFFB800)
 private val C_GRID = Color(0xFF38BDF8)
-private val C_BATT = Color(0xFFB57BFF)
+private val C_BATT = Color(0xFFB496FF)
 private val C_LOAD = Color(0xFF2DD4BF)
 
 /** The cable paths. Built once per size, reused every frame. */
@@ -117,6 +117,13 @@ fun HouseFlow(engine: FlowEngine, state: FlowState, modifier: Modifier = Modifie
 
 private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
 
+// x, y, size, twinkle offset: fixed so the night sky does not shuffle on every frame
+private val STARS = floatArrayOf(
+    118f, 22f, 1.3f, 0.0f,  160f, 48f, 1.0f, 0.3f,  214f, 18f, 1.5f, 0.6f,  250f, 56f, 1.0f, 0.1f,
+    300f, 30f, 1.2f, 0.8f,  352f, 70f, 1.0f, 0.5f,  380f, 20f, 1.4f, 0.2f,  96f, 78f, 1.0f, 0.7f,
+    190f, 84f, 1.1f, 0.4f,  330f, 110f, 1.0f, 0.9f,
+)
+
 private fun DrawScope.drawHouse(e: FlowEngine, g: HouseGeo, m: TextMeasurer, sc: Float, frame: Long) {
     if (!e.ready) return
     val st = e.state ?: return
@@ -128,8 +135,17 @@ private fun DrawScope.drawHouse(e: FlowEngine, g: HouseGeo, m: TextMeasurer, sc:
     // ── sky, sun, drifting clouds ──
     drawRoundRect(
         Brush.verticalGradient(listOf(SKY_TOP, SKY_BOT)),
-        Offset.Zero, Size(x(W), x(H)), CornerRadius(x(22f), x(22f)),
+        Offset.Zero, Size(x(W), x(H)), CornerRadius(x(28f), x(28f)),
     )
+    val night = 1f - solar
+    if (night > 0.05f) {
+        var i = 0
+        while (i < STARS.size) {
+            val tw = 0.55f + 0.45f * sin((e.pulseT / 2.6f + STARS[i + 3]) * 2f * PI.toFloat())
+            drawCircle(Color.White.copy(alpha = 0.75f * night * tw), x(STARS[i + 2]), Offset(x(STARS[i]), x(STARS[i + 1])))
+            i += 4
+        }
+    }
     val sunC = Offset(x(52f), x(46f))
     drawCircle(
         Brush.radialGradient(listOf(C_SOLAR.copy(alpha = 0.40f * solar), Color.Transparent), center = sunC, radius = x(80f)),
@@ -152,13 +168,22 @@ private fun DrawScope.drawHouse(e: FlowEngine, g: HouseGeo, m: TextMeasurer, sc:
     for (i in 0 until 3) {
         val drift = ((seconds * (4f + i * 2f) + i * 130f) % (W + 120f)) - 60f
         val cy = 30f + i * 38f
-        val c = Color.White.copy(alpha = 0.07f)
+        val c = Color.White.copy(alpha = 0.045f)
         drawOval(c, Offset(x(drift), x(cy)), Size(x(70f), x(16f)))
         drawOval(c, Offset(x(drift + 18f), x(cy - 8f)), Size(x(40f), x(18f)))
     }
 
     // ── ground ──
     drawOval(Color.Black.copy(alpha = 0.28f), Offset(x(20f), x(292f)), Size(x(330f), x(26f)))
+    if (solar > 0.02f) {
+        drawOval(
+            Brush.radialGradient(
+                listOf(C_SOLAR.copy(alpha = 0.16f * solar), Color.Transparent),
+                center = Offset(x(215f), x(300f)), radius = x(150f),
+            ),
+            Offset(x(65f), x(268f)), Size(x(300f), x(60f)),
+        )
+    }
 
     // ── pylon (grid) ──
     drawPylon(sc, st.gridUp, e.pipeI(1))
@@ -234,9 +259,14 @@ private fun DrawScope.drawHouse(e: FlowEngine, g: HouseGeo, m: TextMeasurer, sc:
     val gridSub = if (!st.gridUp) "" else if (e.grid < -0.01f) "export" else if (e.grid > 0.01f) "import" else ""
     bubble(m, sc, 10f, 60f, 98f, "Grid", gridText, gridCol, gridSub, pulse)
     bubble(m, sc, 268f, 26f, 120f, "PV", f0(e.pv * 1000.0) + " W", C_SOLAR, if (solar > 0.05f) "generating" else "offline", pulse)
-    bubble(m, sc, 74f, 152f, 108f, "Battery", f0(e.soc.toDouble()) + " %", if (e.soc < 20f) KC.bad else KC.ok,
+    bubble(m, sc, 62f, 152f, 130f, "Battery", f0(e.soc.toDouble()) + " %", if (e.soc < 20f) KC.bad else KC.ok,
         if (st.battCharg) "charging" else if (st.battDisch) "discharging" else "standby", pulse)
     bubble(m, sc, 262f, 296f, 126f, "Load", f0(e.load * 1000.0) + " W", C_LOAD, "", pulse)
+
+    drawRoundRect(
+        Color.White.copy(alpha = 0.09f), Offset.Zero, Size(x(W), x(H)),
+        CornerRadius(x(28f), x(28f)), style = Stroke(x(1.2f)),
+    )
 }
 
 private fun smoothLoad(kw: Float) = FlowEngine.smooth(kw, 0.02f, 0.2f)
@@ -337,18 +367,33 @@ private fun DrawScope.bubble(
     m: TextMeasurer, sc: Float, bx: Float, by: Float, bw: Float,
     title: String, value: String, valueColor: Color, sub: String, pulse: Float,
 ) {
-    val bh = 48f
+    val bh = 50f
     val cx = (bx + bw / 2f) * sc; val cy = (by + bh / 2f) * sc
+    val corner = CornerRadius(25f * sc, 25f * sc)
     withTransform({ scale(pulse, pulse, Offset(cx, cy)) }) {
-        drawRoundRect(Color(0xFF0E1A2A).copy(alpha = 0.82f), Offset(bx * sc, by * sc), Size(bw * sc, bh * sc), CornerRadius(22f * sc, 22f * sc))
-        drawRoundRect(valueColor.copy(alpha = 0.35f), Offset(bx * sc, by * sc), Size(bw * sc, bh * sc), CornerRadius(22f * sc, 22f * sc), style = Stroke(1.2f * sc))
-        val t = m.measure(title, TextStyle(fontSize = (10.5f * sc).toSp(), color = Color.White.copy(alpha = 0.65f)))
-        drawText(t, topLeft = Offset((bx + 14f) * sc, (by + 7f) * sc))
-        val v = m.measure(value, TextStyle(fontSize = (17f * sc).toSp(), fontWeight = FontWeight.Bold, color = valueColor, fontFeatureSettings = "tnum"))
-        drawText(v, topLeft = Offset((bx + 14f) * sc, (by + 21f) * sc))
+        drawRoundRect(
+            Brush.verticalGradient(
+                listOf(Color(0xE61A2A44), Color(0xE60B1424)),
+                startY = by * sc, endY = (by + bh) * sc,
+            ),
+            Offset(bx * sc, by * sc), Size(bw * sc, bh * sc), corner,
+        )
+        drawRoundRect(
+            Brush.verticalGradient(
+                listOf(valueColor.copy(alpha = 0.55f), valueColor.copy(alpha = 0.12f)),
+                startY = by * sc, endY = (by + bh) * sc,
+            ),
+            Offset(bx * sc, by * sc), Size(bw * sc, bh * sc), corner, style = Stroke(1.2f * sc),
+        )
+        // status dot
+        drawCircle(valueColor, 2.6f * sc, Offset((bx + 17f) * sc, (by + 14f) * sc))
+        val t = m.measure(title, TextStyle(fontFamily = KFont, fontWeight = FontWeight.Medium, fontSize = (10.5f * sc).toSp(), color = Color.White.copy(alpha = 0.70f)))
+        drawText(t, topLeft = Offset((bx + 25f) * sc, (by + 7f) * sc))
+        val v = m.measure(value, TextStyle(fontFamily = KFont, fontSize = (18f * sc).toSp(), fontWeight = FontWeight.ExtraBold, color = valueColor, fontFeatureSettings = "tnum"))
+        drawText(v, topLeft = Offset((bx + 15f) * sc, (by + 22f) * sc))
         if (sub.isNotEmpty()) {
-            val s = m.measure(sub, TextStyle(fontSize = (8.5f * sc).toSp(), color = Color.White.copy(alpha = 0.45f)))
-            drawText(s, topLeft = Offset((bx + bw - 14f) * sc - s.size.width, (by + 10f) * sc))
+            val s = m.measure(sub, TextStyle(fontFamily = KFont, fontWeight = FontWeight.Medium, fontSize = (9f * sc).toSp(), color = Color.White.copy(alpha = 0.50f)))
+            drawText(s, topLeft = Offset((bx + bw - 16f) * sc - s.size.width, (by + 9f) * sc))
         }
     }
 }

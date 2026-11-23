@@ -69,7 +69,7 @@ private fun withDerivedFlow(t: Today): Today {
     return t.copy(grid = grid, battKw = batt)
 }
 
-private val Tabular = TextStyle(fontFeatureSettings = "tnum")
+private val Tabular = TextStyle(fontFamily = KFont, fontFeatureSettings = "tnum")
 
 /** The one sentence that answers "what is running my house right now?" */
 private fun headline(f: FlowState): String = when {
@@ -130,7 +130,7 @@ fun LiveScreen(vm: AppViewModel) {
 
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         vm.todayError?.let { Note(it, KC.warn) }
         if (t == null) {
@@ -141,10 +141,7 @@ fun LiveScreen(vm: AppViewModel) {
 
         StatusHeader(t, f, vm)
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = view == 0, onClick = { view = 0 }, label = { Text("House") })
-            FilterChip(selected = view == 1, onClick = { view = 1 }, label = { Text("Diagram") })
-        }
+        Segmented(listOf("House", "Diagram"), view, { view = it }, Modifier.fillMaxWidth())
         if (view == 0) HouseFlow(vm.flow, f) else FlowDiagram(vm.flow, f)
         Text(
             f.statusLine(), color = KC.mute, fontSize = 12.sp, textAlign = TextAlign.Center,
@@ -256,7 +253,7 @@ fun LiveScreen(vm: AppViewModel) {
         }
 
         // ── Live inverter readings ──
-        Text("Inverter readings", color = KC.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        SectionLabel("Inverter readings")
         ParamTiles(t)
         KCard {
             KV("Peak load today", "${f2(t.peakLoad)} kW")
@@ -269,23 +266,23 @@ fun LiveScreen(vm: AppViewModel) {
 
 @Composable
 private fun StatusHeader(t: Today, f: FlowState, vm: AppViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 4.dp)) {
         Crossfade(headline(f), label = "headline") { h ->
             Text(
                 h, color = if (!f.gridUp) KC.bad else KC.text,
-                fontSize = 26.sp, fontWeight = FontWeight.SemiBold, lineHeight = 32.sp,
+                fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 32.sp,
             )
         }
         subline(t, f)?.let { Text(it, color = KC.mute, fontSize = 14.sp) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             val gv = if (t.gridV > 1.0) ", ${f0(t.gridV)} V" else if (t.gridHz > 1.0) ", ${f1(t.gridHz)} Hz" else ""
             when (t.gridUp) {
-                1 -> Pill("Grid up$gv", KC.ok)
-                0 -> Pill("Grid down$gv", KC.bad)
-                else -> Pill("Grid unknown$gv", KC.mute)
+                1 -> DotPill("Grid up$gv", KC.ok)
+                0 -> DotPill("Grid down$gv", KC.bad)
+                else -> DotPill("Grid unknown$gv", KC.mute)
             }
             val g = vm.guard
-            if (g != null) Pill(if (g.ok) "Logging OK" else "Logging stuck", if (g.ok) KC.ok else KC.bad)
+            if (g != null) DotPill(if (g.ok) "Logging OK" else "Logging stuck", if (g.ok) KC.ok else KC.bad)
         }
         vm.gridToday?.let { g ->
             Text(
@@ -297,43 +294,43 @@ private fun StatusHeader(t: Today, f: FlowState, vm: AppViewModel) {
     }
 }
 
-/** Solar, home and battery side by side in one strip. */
+/** Solar, home and battery as three bento tiles, each tinted by its own colour. */
 @Composable
 private fun KeyNumbers(t: Today, f: FlowState, systemKw: Double?) {
-    val shape = RoundedCornerShape(22.dp)
+    val share = if (systemKw != null && systemKw > 0.0) (t.pv / systemKw).toFloat().coerceIn(0f, 1f) else null
+    val pvSub = if (systemKw != null && systemKw > 0.0) "${f0(t.pv / systemKw * 100.0)}% of ${f1(systemKw)} kW" else f.solarSub()
+    val battColor = if (t.soc >= 60) KC.ok else if (t.soc >= 30) KC.warn else KC.bad
     Row(
-        Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(shape).background(KC.glass)
-            .border(1.dp, Color.White.copy(alpha = 0.06f), shape).padding(vertical = 16.dp),
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val share = if (systemKw != null && systemKw > 0.0) (t.pv / systemKw).toFloat().coerceIn(0f, 1f) else null
-        val pvSub = if (systemKw != null && systemKw > 0.0) "${f0(t.pv / systemKw * 100.0)}% of ${f1(systemKw)} kW" else f.solarSub()
-        KeyCol("Solar", t.pv, 2, "kW", KC.solar, pvSub, share, Modifier.weight(1f))
-        Box(Modifier.width(1.dp).fillMaxHeight().background(KC.track))
-        KeyCol("Home", t.load, 2, "kW", KC.text, f.homeSub().replaceFirstChar { it.uppercase() }, null, Modifier.weight(1f))
-        Box(Modifier.width(1.dp).fillMaxHeight().background(KC.track))
-        val battColor = if (t.soc >= 60) KC.ok else if (t.soc >= 30) KC.warn else KC.bad
-        KeyCol("Battery", t.soc, 0, "%", battColor, f.battSub().replaceFirstChar { it.uppercase() }, (t.soc / 100.0).toFloat().coerceIn(0f, 1f), Modifier.weight(1f))
+        KeyTile("Solar", t.pv, 2, "kW", KC.solar, pvSub, share, Modifier.weight(1f).fillMaxHeight())
+        KeyTile("Home", t.load, 2, "kW", KC.load, f.homeSub().replaceFirstChar { it.uppercase() }, null, Modifier.weight(1f).fillMaxHeight())
+        KeyTile("Battery", t.soc, 0, "%", battColor, f.battSub().replaceFirstChar { it.uppercase() }, (t.soc / 100.0).toFloat().coerceIn(0f, 1f), Modifier.weight(1f).fillMaxHeight())
     }
 }
 
 @Composable
-private fun KeyCol(
+private fun KeyTile(
     label: String, value: Double, decimals: Int, unit: String, color: Color,
     sub: String, bar: Float?, modifier: Modifier,
 ) {
-    Column(modifier.padding(horizontal = 12.dp)) {
-        Text(label, color = KC.mute, fontSize = 12.sp)
-        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 2.dp)) {
-            AnimatedNumber(value, decimals, color, 22.sp)
+    AccentCard(color, modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).background(color, RoundedCornerShape(50)))
+            Text(label, color = KC.mute, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
+        }
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 10.dp)) {
+            AnimatedNumber(value, decimals, KC.text, 22.sp, FontWeight.ExtraBold)
             Text(" $unit", color = KC.mute, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
         if (bar != null) {
             val frac = easedFloat(bar, 900)
-            Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(KC.track)) {
+            Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(KC.track)) {
                 Box(Modifier.fillMaxWidth(frac.coerceAtLeast(0.01f)).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(color))
             }
         }
-        Text(sub, color = KC.mute, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+        Text(sub, color = KC.mute, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
     }
 }
 

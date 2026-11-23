@@ -149,7 +149,7 @@ private fun DrawScope.drawFlow(e: FlowEngine, g: Geo, m: TextMeasurer, sc: Float
             TextStyle(
                 color = Color.White, fontSize = (fs * sc).toSp(),
                 fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-                fontFamily = if (mono) FontFamily.Monospace else null,
+                fontFamily = if (mono) FontFamily.Monospace else KFont,
                 fontFeatureSettings = "tnum",
             ),
         )

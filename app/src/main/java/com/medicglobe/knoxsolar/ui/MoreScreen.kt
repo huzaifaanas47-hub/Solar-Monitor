@@ -52,7 +52,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 private val MON = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-private val Tab = TextStyle(fontFeatureSettings = "tnum")
+private val Tab = TextStyle(fontFamily = KFont, fontFeatureSettings = "tnum")
 
 private fun money(v: Double): String = String.format(Locale.US, "%,.0f", v)
 private fun sgn(v: Double, f: (Double) -> String) = (if (v > 0.0) "+" else "") + f(v)

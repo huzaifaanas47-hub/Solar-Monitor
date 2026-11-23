@@ -1,11 +1,13 @@
 package com.medicglobe.knoxsolar.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -29,18 +31,21 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -48,21 +53,87 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
 @Composable
-fun KCard(title: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(22.dp)
+fun KCard(
+    title: String? = null, modifier: Modifier = Modifier, accent: Color? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(26.dp)
     Column(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(KC.glass)
-            .border(1.dp, Color.White.copy(alpha = 0.06f), shape)
-            .padding(horizontal = 18.dp, vertical = 16.dp)
+            .background(KC.cardBrush)
+            .border(
+                1.dp,
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.11f), Color.White.copy(alpha = 0.03f))),
+                shape,
+            )
+            .drawBehind {
+                if (accent != null) {
+                    drawCircle(
+                        Brush.radialGradient(
+                            listOf(accent.copy(alpha = 0.13f), Color.Transparent),
+                            center = Offset(size.width, 0f), radius = size.width * 0.75f,
+                        ),
+                        radius = size.width * 0.75f, center = Offset(size.width, 0f),
+                    )
+                }
+            }
+            .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
         if (title != null) {
-            Text(title, color = KC.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Box(Modifier.height(12.dp))
+            Text(title, color = KC.text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Box(Modifier.height(14.dp))
         }
         content()
+    }
+}
+
+/** Small spaced-out caption that sits above a group of cards. */
+@Composable
+fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text.uppercase(), color = KC.mute, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        letterSpacing = 1.2.sp, modifier = modifier.padding(start = 4.dp, top = 4.dp),
+    )
+}
+
+/** Pill-shaped segmented control. The selected segment glows in the accent colour. */
+@Composable
+fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier.clip(shape).background(Color.White.copy(alpha = 0.06f))
+            .border(1.dp, Color.White.copy(alpha = 0.06f), shape).padding(4.dp),
+    ) {
+        options.forEachIndexed { i, label ->
+            val on = i == selected
+            val bg by animateColorAsState(if (on) KC.acc.copy(alpha = 0.18f) else Color.Transparent, tween(220), label = "seg")
+            Box(
+                Modifier.weight(1f).clip(shape).background(bg).clickable { onSelect(i) }.padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label, color = if (on) KC.acc else KC.mute, fontSize = 13.sp,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Medium, textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+/** Pill with a coloured dot in front. */
+@Composable
+fun DotPill(text: String, color: Color) {
+    Row(
+        Modifier
+            .background(color.copy(alpha = 0.12f), RoundedCornerShape(50))
+            .border(1.dp, color.copy(alpha = 0.22f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).background(color, CircleShape))
+        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 7.dp))
     }
 }
 
@@ -72,8 +143,8 @@ fun Stat(label: String, value: String, modifier: Modifier = Modifier, color: Col
         Text(label, color = KC.mute, fontSize = 12.sp)
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                value, color = color, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
-                style = TextStyle(fontFeatureSettings = "tnum"),
+                value, color = color, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                style = TextStyle(fontFamily = KFont, fontFeatureSettings = "tnum"),
             )
             if (unit.isNotEmpty()) Text(" $unit", color = KC.mute, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
@@ -93,7 +164,7 @@ fun StatRow(content: @Composable RowScope.() -> Unit) {
 fun KV(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = KC.mute, fontSize = 14.sp)
-        Text(value, color = KC.text, fontSize = 14.sp, style = TextStyle(fontFeatureSettings = "tnum"))
+        Text(value, color = KC.text, fontSize = 14.sp, style = TextStyle(fontFamily = KFont, fontFeatureSettings = "tnum"))
     }
 }
 
@@ -101,8 +172,8 @@ fun KV(label: String, value: String) {
 fun Pill(text: String, color: Color) {
     Box(
         Modifier
-            .background(color.copy(alpha = 0.14f), RoundedCornerShape(50))
-            .padding(horizontal = 11.dp, vertical = 5.dp)
+            .background(color.copy(alpha = 0.13f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 5.dp)
     ) { Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
 }
 
@@ -144,7 +215,11 @@ fun BarChart(values: List<Double>, color: Color, modifier: Modifier = Modifier, 
             val h = (values[i] / max * size.height).toFloat() * g
             if (h < 0.5f) continue
             val c = if (highlight >= 0 && i != highlight) color.copy(alpha = 0.55f) else color
-            drawRoundRect(c, Offset(i * (bw + gap), size.height - h), Size(bw, h), CornerRadius(r, r))
+            val top = size.height - h
+            drawRoundRect(
+                Brush.verticalGradient(listOf(c, c.copy(alpha = c.alpha * 0.35f)), startY = top, endY = size.height),
+                Offset(i * (bw + gap), top), Size(bw, h), CornerRadius(r, r),
+            )
         }
     }
 }
@@ -192,7 +267,10 @@ fun LineChart(
 
         for (i in 0..4) {
             val y = h * i / 4f
-            drawLine(KC.line, Offset(0f, y), Offset(w, y), 1.dp.toPx())
+            drawLine(
+                Color.White.copy(alpha = 0.07f), Offset(0f, y), Offset(w, y), 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 6.dp.toPx())),
+            )
         }
         for (r in shaded) {
             val x0 = xOf(r.first)
@@ -211,7 +289,12 @@ fun LineChart(
                 s.pts.forEachIndexed { i, pt ->
                     val px = xOf(pt.first)
                     val py = yOf(pt.second)
-                    if (i == 0) line.moveTo(px, py) else line.lineTo(px, py)
+                    if (i == 0) line.moveTo(px, py) else {
+                        // horizontal-tangent curve between points: smooth, and it never overshoots the data
+                        val prev = s.pts[i - 1]
+                        val cx = (xOf(prev.first) + px) / 2f
+                        line.cubicTo(cx, yOf(prev.second), cx, py, px, py)
+                    }
                 }
                 if (s.fill) {
                     val base = yOf(maxOf(yMin, 0f))
@@ -220,9 +303,10 @@ fun LineChart(
                     area.lineTo(xOf(s.pts.last().first), base)
                     area.lineTo(xOf(s.pts.first().first), base)
                     area.close()
-                    drawPath(area, Brush.verticalGradient(listOf(s.color.copy(alpha = 0.30f), Color.Transparent), startY = 0f, endY = h))
+                    drawPath(area, Brush.verticalGradient(listOf(s.color.copy(alpha = 0.34f), Color.Transparent), startY = 0f, endY = h))
                 }
-                drawPath(line, s.color, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(line, s.color.copy(alpha = 0.16f), style = Stroke(6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(line, s.color, style = Stroke(2.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
         }
 
@@ -232,7 +316,7 @@ fun LineChart(
             for (s in series) {
                 val p = s.pts.minByOrNull { abs(it.first - cursor) } ?: continue
                 val c = Offset(xOf(p.first), yOf(p.second))
-                drawCircle(Color(0xFF04080F), radius = 5.dp.toPx(), center = c)
+                drawCircle(KC.bg, radius = 5.5.dp.toPx(), center = c)
                 drawCircle(s.color, radius = 3.5.dp.toPx(), center = c)
             }
         }

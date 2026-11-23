@@ -52,7 +52,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private val MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-private val Tabular = TextStyle(fontFeatureSettings = "tnum")
+private val Tabular = TextStyle(fontFamily = KFont, fontFeatureSettings = "tnum")
 private val ShortDate = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 // The Material date picker works in UTC midnight milliseconds.
