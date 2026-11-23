@@ -41,7 +41,7 @@ fun GridScreen(vm: AppViewModel) {
 
         if (sm != null && vm.gridError == null) {
             item {
-                KCard("OUTAGES (ignoring blips under 2 min)") {
+                KCard("Outages (blips under 2 min ignored)") {
                     StatRow {
                         Stat("Count", sm.count.toString(), Modifier.weight(1f), if (sm.count > 0) KC.bad else KC.ok)
                         Stat("Total downtime", fmtDur(sm.totalSec), Modifier.weight(1f))

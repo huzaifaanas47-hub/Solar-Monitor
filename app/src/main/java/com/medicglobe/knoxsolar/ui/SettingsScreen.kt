@@ -49,7 +49,7 @@ fun SettingsScreen(vm: AppViewModel) {
         Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        KCard("SERVER") {
+        KCard("Server") {
             OutlinedTextField(
                 value = url, onValueChange = { url = it }, singleLine = true,
                 label = { Text("Server address (https://…)") },
@@ -68,7 +68,7 @@ fun SettingsScreen(vm: AppViewModel) {
             }
         }
 
-        KCard("INVERTER LOGIN") {
+        KCard("Inverter login") {
             Note("The DessMonitor login, device and admin password are managed on your server's settings page (protected by your admin password). It opens in your browser.")
             OutlinedButton(onClick = {
                 try {
@@ -77,7 +77,7 @@ fun SettingsScreen(vm: AppViewModel) {
             }) { Text("Open inverter settings") }
         }
 
-        KCard("ALERTS") {
+        KCard("Alerts") {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Grid down / back", color = KC.text)
                 Switch(checked = nOutage, onCheckedChange = { nOutage = it; Prefs.setNotifyOutage(ctx, it) })
@@ -89,7 +89,7 @@ fun SettingsScreen(vm: AppViewModel) {
             Note("Checked about every 15 minutes in the background, even when the app is closed.")
         }
 
-        KCard("ELECTRICITY PRICE (Rs per kWh)") {
+        KCard("Electricity price (Rs per kWh)") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = buy, onValueChange = { buy = it }, singleLine = true, label = { Text("Buy") },
@@ -106,7 +106,7 @@ fun SettingsScreen(vm: AppViewModel) {
             }
         }
 
-        KCard("DATA LOGGING") {
+        KCard("Data logging") {
             val g = vm.guard
             if (g == null) Note("Checking…") else {
                 KV("Status", if (g.ok) "Working" else "Stuck")

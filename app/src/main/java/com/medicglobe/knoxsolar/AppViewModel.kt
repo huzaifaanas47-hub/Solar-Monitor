@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.medicglobe.knoxsolar.ui.FlowEngine
 import org.json.JSONObject
 import java.time.LocalDate
 
@@ -23,20 +24,58 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var todayError by mutableStateOf<String?>(null); private set
     var refreshing by mutableStateOf(false); private set
     var guard by mutableStateOf<Guard?>(null); private set
+    var lastUpdated by mutableStateOf(0L); private set          // when the last good reading arrived
     private var lastGuard = 0L
+
+    /** Drives the energy-flow animation. Kept here so it carries on smoothly when you switch tabs. */
+    val flow = FlowEngine()
+
+    // System size and battery capacity come from the server's own settings.
+    var systemKw by mutableStateOf<Double?>(null); private set
+    var batteryKwh by mutableStateOf<Double?>(null); private set
+    private var lastSystem = 0L
+
+    // Today's power curve and outage summary, shown on the Live tab.
+    var curve by mutableStateOf<List<Point>>(emptyList()); private set
+    var gridToday by mutableStateOf<GridSummary?>(null); private set
+    private var lastExtras = 0L
 
     fun refreshLive() = viewModelScope.launch {
         refreshing = true
         val j = get("proxy.php?action=get_today")
         val row = j?.optJSONObject("row")
+        val now = System.currentTimeMillis()
         when {
             j == null -> todayError = "Cannot reach the server."
             row == null -> { todayError = "No reading saved for today yet."; today = null }
-            else -> { today = Today.from(row); todayError = null }
+            else -> { today = Today.from(row); todayError = null; lastUpdated = now }
         }
         refreshing = false
-        val now = System.currentTimeMillis()
         if (now - lastGuard > 60_000L) { lastGuard = now; loadGuard(false) }
+        if (row != null && now - lastExtras > 120_000L) { lastExtras = now; loadExtras() }
+        if ((systemKw == null || batteryKwh == null) && now - lastSystem > 300_000L) { lastSystem = now; loadSystem() }
+    }
+
+    private fun loadSystem() = viewModelScope.launch {
+        val s = get("proxy.php?action=get_settings")?.optJSONObject("settings") ?: return@launch
+        systemKw = s.optJSONObject("system_kw")?.d("setting_value")?.takeIf { it > 0.0 }
+        batteryKwh = s.optJSONObject("battery_kw")?.d("setting_value")?.takeIf { it > 0.0 }
+    }
+
+    private fun loadExtras() = viewModelScope.launch {
+        val day = LocalDate.now()
+        val log = get("proxy.php?action=cron_log&date=$day")?.optJSONArray("rows")
+        if (log != null) {
+            curve = (0 until log.length()).mapNotNull { log.optJSONObject(it) }.mapNotNull { Point.from(it) }
+        }
+        val g = get("proxy.php?action=grid_events&from=$day&to=$day")
+        val sm = g?.optJSONObject("summary")
+        if (sm != null) {
+            gridToday = GridSummary(
+                sm.optInt("count", 0), sm.optLong("total_sec", 0), sm.optLong("longest_sec", 0),
+                sm.d("battery_kwh"), sm.d("load_kwh"),
+            )
+        }
     }
 
     fun loadGuard(force: Boolean) = viewModelScope.launch {
