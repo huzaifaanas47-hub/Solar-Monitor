@@ -25,4 +25,10 @@ object Prefs {
 
     fun notifyStuck(c: Context) = sp(c).getBoolean("n_stuck", true)
     fun setNotifyStuck(c: Context, v: Boolean) = sp(c).edit().putBoolean("n_stuck", v).apply()
+
+    // ROI calculator inputs (-1 = never saved)
+    fun roiCost(c: Context): Double = sp(c).getFloat("roi_cost", -1f).toDouble()
+    fun roiSave(c: Context): Double = sp(c).getFloat("roi_save", -1f).toDouble()
+    fun setRoi(c: Context, cost: Double, save: Double) =
+        sp(c).edit().putFloat("roi_cost", cost.toFloat()).putFloat("roi_save", save.toFloat()).apply()
 }

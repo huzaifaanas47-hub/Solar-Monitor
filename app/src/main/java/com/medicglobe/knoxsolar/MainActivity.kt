@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (intent?.action == ACTION_OPEN_SETTINGS) tab.intValue = 4
+        if (intent?.action == ACTION_OPEN_SETTINGS) tab.intValue = 5
 
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == ACTION_OPEN_SETTINGS) tab.intValue = 4
+        if (intent.action == ACTION_OPEN_SETTINGS) tab.intValue = 5
     }
 
     companion object {

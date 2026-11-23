@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -119,11 +121,12 @@ private fun estimate(t: Today, f: FlowState, capKwh: Double?): Estimate? {
     return null
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveScreen(vm: AppViewModel) {
     val t = vm.today?.let { withDerivedFlow(it) }
     var cursor by remember { mutableStateOf<Float?>(null) }
-    var showDetails by remember { mutableStateOf(false) }
+    var view by remember { mutableStateOf(0) }
 
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -138,7 +141,11 @@ fun LiveScreen(vm: AppViewModel) {
 
         StatusHeader(t, f, vm)
 
-        FlowDiagram(vm.flow, f)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = view == 0, onClick = { view = 0 }, label = { Text("House") })
+            FilterChip(selected = view == 1, onClick = { view = 1 }, label = { Text("Diagram") })
+        }
+        if (view == 0) HouseFlow(vm.flow, f) else FlowDiagram(vm.flow, f)
         Text(
             f.statusLine(), color = KC.mute, fontSize = 12.sp, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
@@ -248,31 +255,13 @@ fun LiveScreen(vm: AppViewModel) {
             }
         }
 
-        // ── Inverter details, collapsed until asked for ──
+        // ── Live inverter readings ──
+        Text("Inverter readings", color = KC.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        ParamTiles(t)
         KCard {
-            val turn by animateFloatAsState(if (showDetails) 180f else 0f, label = "chevron")
-            Row(
-                Modifier.fillMaxWidth().clickable { showDetails = !showDetails },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Inverter details", color = KC.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Icon(
-                    Icons.Filled.ArrowDropDown,
-                    contentDescription = if (showDetails) "Hide details" else "Show details",
-                    tint = KC.mute, modifier = Modifier.rotate(turn),
-                )
-            }
-            AnimatedVisibility(showDetails) {
-                Column(Modifier.padding(top = 10.dp)) {
-                    KV("Solar panels", "${f0(t.pvV)} V, ${f1(t.pvA)} A")
-                    KV("Battery voltage", "${f1(t.battV)} V")
-                    KV("Grid voltage", if (t.gridV > 1.0) "${f1(t.gridV)} V" else if (t.gridUp == 0) "no supply" else "not reported")
-                    KV("Grid frequency", if (t.gridHz > 1.0) "${f1(t.gridHz)} Hz" else "not reported")
-                    KV("Inverter temperature", "${f0(t.temp)} °C")
-                    KV("Peak load today", "${f2(t.peakLoad)} kW")
-                    t.updatedAt?.let { KV("Last saved on server", it) }
-                }
-            }
+            KV("Peak load today", "${f2(t.peakLoad)} kW")
+            KV("Lowest battery today", "${f0(t.minSoc)}%")
+            t.updatedAt?.let { KV("Last saved on server", it) }
         }
         Box(Modifier.padding(bottom = 8.dp))
     }

@@ -140,3 +140,37 @@ data class Guard(
         }
     }
 }
+
+/** One month from proxy.php?action=monthly_summary. Empty money / CO2 columns are estimated like the web dashboard. */
+data class MonthRow(
+    val mo: Int, val name: String, val days: Int,
+    val gen: Double, val use: Double, val buy: Double, val sent: Double,
+    val cost: Double, val savings: Double, val co2: Double,
+) {
+    companion object {
+        fun from(o: JSONObject, price: Double): MonthRow {
+            val gen = o.d("gen"); val buy = o.d("buy")
+            return MonthRow(
+                mo = o.optInt("mo", 0), name = o.s("mon_name") ?: "", days = o.optInt("days", 0),
+                gen = gen, use = o.d("use_kwh"), buy = buy, sent = o.d("sent"),
+                cost = o.d("cost").takeIf { it > 0.0 } ?: Math.round(buy * price).toDouble(),
+                savings = o.d("savings").takeIf { it > 0.0 } ?: Math.round(gen * price).toDouble(),
+                co2 = o.d("co2").takeIf { it > 0.0 } ?: (gen * 0.4),
+            )
+        }
+    }
+}
+
+/** One editable server setting (proxy.php?action=get_settings). */
+data class SettingRow(val key: String, val label: String, val value: String, val numeric: Boolean)
+
+/** Database health (proxy.php?action=db_summary). */
+data class DbSummary(
+    val alive: Boolean, val totalDays: String, val first: String?, val last: String?,
+    val gen: Double, val savings: Double, val cost: Double, val co2: Double,
+)
+
+/** Last cron worker run (proxy.php?action=cron_status). */
+data class CronLast(
+    val ranAt: String, val status: String?, val pv: Double, val load: Double, val soc: Double, val gen: Double,
+)

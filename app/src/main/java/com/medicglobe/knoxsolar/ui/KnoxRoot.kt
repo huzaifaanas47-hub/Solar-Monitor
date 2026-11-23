@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -51,6 +52,7 @@ private val TABS = listOf(
     TabDef("History", Icons.Filled.DateRange),
     TabDef("Timeline", Icons.Filled.List),
     TabDef("Grid", Icons.Filled.Warning),
+    TabDef("More", Icons.Filled.Menu),
     TabDef("Settings", Icons.Filled.Settings),
 )
 
@@ -153,6 +155,7 @@ fun KnoxRoot(vm: AppViewModel, tab: Int, onTab: (Int) -> Unit) {
                             1 -> vm.reloadHistory()
                             2 -> vm.loadTimeline()
                             3 -> vm.loadGrid()
+                            4 -> { vm.loadMonthly(); vm.loadInsights(); vm.loadSysInfo(); vm.reloadHistory() }
                         }
                     }) { RefreshIcon(vm.refreshing) }
                 }
@@ -163,6 +166,7 @@ fun KnoxRoot(vm: AppViewModel, tab: Int, onTab: (Int) -> Unit) {
                             1 -> HistoryScreen(vm)
                             2 -> TimelineScreen(vm)
                             3 -> GridScreen(vm)
+                            4 -> MoreScreen(vm)
                             else -> SettingsScreen(vm)
                         }
                     }

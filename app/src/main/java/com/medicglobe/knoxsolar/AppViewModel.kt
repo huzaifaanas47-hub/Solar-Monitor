@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.medicglobe.knoxsolar.ui.FlowEngine
 import org.json.JSONObject
+import android.net.Uri
 import java.time.LocalDate
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -213,6 +214,123 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         gridLoading = false
+    }
+
+    // ── Monthly totals (Savings tab) ──
+    var monthly by mutableStateOf<List<MonthRow>>(emptyList()); private set
+    var monthlyError by mutableStateOf<String?>(null); private set
+
+    fun loadMonthly() = viewModelScope.launch {
+        ensurePrices()
+        val arr = get("proxy.php?action=monthly_summary&year=${LocalDate.now().year}")?.optJSONArray("months")
+        if (arr == null) {
+            monthlyError = "Could not load the monthly totals."
+        } else {
+            monthlyError = null
+            val price = priceBuy.toDoubleOrNull() ?: 0.0
+            monthly = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { MonthRow.from(it, price) }.sortedBy { it.mo }
+        }
+    }
+
+    // ── Last 60 days, for the Insights tab (kept apart from the History selection) ──
+    var insightDays by mutableStateOf<List<Day>>(emptyList()); private set
+    var insightError by mutableStateOf<String?>(null); private set
+
+    fun loadInsights() = viewModelScope.launch {
+        ensurePrices()
+        val to = LocalDate.now()
+        val arr = get("proxy.php?action=history&date_from=${to.minusDays(59)}&date_to=$to")?.optJSONArray("rows")
+        if (arr == null) {
+            insightError = "Could not load recent days."
+        } else {
+            insightError = null
+            val price = priceBuy.toDoubleOrNull() ?: 0.0
+            insightDays = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { Day.from(it, price) }.sortedBy { it.date }
+        }
+    }
+
+    // ── System tab: database health, cron status, editable server settings, grid diagnosis ──
+    var db by mutableStateOf<DbSummary?>(null); private set
+    var cron by mutableStateOf<CronLast?>(null); private set
+    var cronLoaded by mutableStateOf(false); private set
+    var serverSettings by mutableStateOf<List<SettingRow>>(emptyList()); private set
+    var sysMsg by mutableStateOf<String?>(null); private set
+    var sysError by mutableStateOf<String?>(null); private set
+    var diag by mutableStateOf<List<String>>(emptyList()); private set
+    var diagBusy by mutableStateOf(false); private set
+
+    private val settingKeys = listOf("owner_name", "system_kw", "battery_kw", "co2_factor", "refresh_secs", "alert_batt_low", "alert_grid_high")
+    private val settingDefaults = mapOf(
+        "alert_batt_low" to SettingRow("alert_batt_low", "Battery low alert (%)", "20", true),
+        "alert_grid_high" to SettingRow("alert_grid_high", "Grid import alert (kW)", "3", true),
+    )
+
+    fun loadSysInfo() = viewModelScope.launch {
+        sysError = null
+        val d = get("proxy.php?action=db_summary")
+        if (d == null) sysError = "Could not reach the server." else {
+            val s = d.optJSONObject("summary")
+            db = DbSummary(
+                d.flag("alive"), s?.s("total_days") ?: "0", s?.s("first_day"), s?.s("last_day"),
+                s?.d("total_gen") ?: 0.0, s?.d("total_savings") ?: 0.0, s?.d("total_cost") ?: 0.0, s?.d("total_co2") ?: 0.0,
+            )
+        }
+        val c = get("proxy.php?action=cron_status")
+        if (c != null) {
+            val l = c.optJSONObject("last")
+            cron = if (l == null) null else CronLast(
+                l.optString("ran_at"), l.s("status"), l.d("pv_power"), l.d("load_power"), l.d("battery_soc"), l.d("energy_today"),
+            )
+            cronLoaded = true
+        }
+        val st = get("proxy.php?action=get_settings")?.optJSONObject("settings")
+        if (st != null) {
+            serverSettings = settingKeys.mapNotNull { k ->
+                val o = st.optJSONObject(k)
+                if (o != null) {
+                    val type = o.optString("setting_type", "text")
+                    SettingRow(k, o.s("label") ?: k, o.optString("setting_value"), type == "int" || type == "float")
+                } else settingDefaults[k]
+            }
+        }
+    }
+
+    fun saveSettings(values: Map<String, String>) = viewModelScope.launch {
+        sysMsg = "Saving…"
+        var ok = true
+        for ((k, v) in values) {
+            if (!withContext(Dispatchers.IO) { Net.ok(base() + "proxy.php?action=save_setting&key=" + Uri.encode(k) + "&val=" + Uri.encode(v)) }) ok = false
+        }
+        sysMsg = if (ok) "Settings saved." else "Some settings could not be saved."
+        systemKw = null; batteryKwh = null; lastSystem = 0L   // re-read system size and battery capacity
+        loadSysInfo()
+    }
+
+    fun diagnoseGrid() = viewModelScope.launch {
+        diagBusy = true
+        val j = get("proxy.php?action=debug_live_pars")
+        val out = ArrayList<String>()
+        if (j == null) {
+            out.add("Diagnosis failed: no answer from the server.")
+        } else if (j.flag("err")) {
+            out.add(j.s("desc") ?: "No data available yet.")
+        } else {
+            out.add("Last live poll: " + (j.s("updated_at") ?: "—"))
+            j.optJSONObject("detected")?.let { det ->
+                val st = when (det.optInt("up", 2)) { 0 -> "DOWN"; 1 -> "UP"; else -> "UNKNOWN" }
+                out.add("Detected grid state: $st" + (det.s("reason")?.let { " — $it" } ?: ""))
+                out.add("Voltage parameter: " + (det.s("v_key") ?: "none found") + "   Frequency parameter: " + (det.s("f_key") ?: "none found"))
+            }
+            val likely = j.optJSONObject("likely_grid_related_params")
+            if (likely != null && likely.length() > 0) {
+                out.add("Parameters that look grid related:")
+                likely.keys().forEach { k -> out.add("  $k = ${likely.opt(k)}") }
+            } else {
+                out.add("No grid / voltage / frequency parameters were found in the last poll.")
+            }
+        }
+        diag = out
+        diagBusy = false
     }
 
     // ── Tariff (Settings) ──

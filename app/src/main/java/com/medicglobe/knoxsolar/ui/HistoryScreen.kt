@@ -67,65 +67,12 @@ fun HistoryScreen(vm: AppViewModel) {
     LaunchedEffect(Unit) { vm.reloadHistory() }
     val days = vm.days
     val ctx = LocalContext.current
-    var picker by remember { mutableStateOf(false) }
-
-    if (picker) {
-        RangeDialog(
-            initFrom = vm.histFrom, initTo = vm.histTo,
-            onDismiss = { picker = false },
-            onPick = { a, b -> picker = false; vm.loadRange(a, b) },
-        )
-    }
 
     LazyColumn(
         Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item {
-            Column(Modifier.padding(top = 12.dp)) {
-                // Quick ranges + custom picker
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val today = LocalDate.now()
-                    val from = vm.histFrom; val to = vm.histTo
-                    val is7 = from == today.minusDays(6) && to == today
-                    val is30 = from == today.minusDays(29) && to == today
-                    FilterChip(selected = is7, onClick = { vm.loadRange(today.minusDays(6), today) }, label = { Text("Last 7 days") })
-                    FilterChip(selected = is30, onClick = { vm.loadRange(today.minusDays(29), today) }, label = { Text("Last 30 days") })
-                    FilterChip(
-                        selected = vm.histCustom && !is7 && !is30,
-                        onClick = { picker = true },
-                        label = { Text("Custom dates") },
-                    )
-                }
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    val ys = if (vm.years.isEmpty()) listOf(vm.histYear) else vm.years
-                    for (y in ys) FilterChip(
-                        selected = !vm.histCustom && y == vm.histYear,
-                        onClick = { vm.loadHistory(year = y) },
-                        label = { Text(y.toString()) },
-                    )
-                }
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilterChip(selected = !vm.histCustom && vm.histMonth == 0, onClick = { vm.loadHistory(month = 0) }, label = { Text("Whole year") })
-                    MONTHS.forEachIndexed { i, m ->
-                        FilterChip(selected = !vm.histCustom && vm.histMonth == i + 1, onClick = { vm.loadHistory(month = i + 1) }, label = { Text(m) })
-                    }
-                }
-                val f = vm.histFrom; val t = vm.histTo
-                if (f != null && t != null) {
-                    Text(
-                        f.format(ShortDate) + "  –  " + t.format(ShortDate) + "   (" + (ChronoUnit.DAYS.between(f, t) + 1) + " days)",
-                        color = KC.acc, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp),
-                    )
-                }
-            }
-        }
+        item { PeriodChips(vm) }
 
         vm.histError?.let { err -> item { Note(err, KC.warn) } }
         if (vm.histLoading) item { Note("Loading…") }
@@ -214,6 +161,63 @@ fun HistoryScreen(vm: AppViewModel) {
         }
         item { Box(Modifier.height(8.dp)) }
     }
+}
+
+/** Year / month / quick-range chips plus the custom date-range picker. Shared by History and Graphs. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PeriodChips(vm: AppViewModel) {
+    var picker by remember { mutableStateOf(false) }
+    if (picker) {
+        RangeDialog(
+            initFrom = vm.histFrom, initTo = vm.histTo,
+            onDismiss = { picker = false },
+            onPick = { a, b -> picker = false; vm.loadRange(a, b) },
+        )
+    }
+    Column(Modifier.padding(top = 12.dp)) {
+                // Quick ranges + custom picker
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val today = LocalDate.now()
+                    val from = vm.histFrom; val to = vm.histTo
+                    val is7 = from == today.minusDays(6) && to == today
+                    val is30 = from == today.minusDays(29) && to == today
+                    FilterChip(selected = is7, onClick = { vm.loadRange(today.minusDays(6), today) }, label = { Text("Last 7 days") })
+                    FilterChip(selected = is30, onClick = { vm.loadRange(today.minusDays(29), today) }, label = { Text("Last 30 days") })
+                    FilterChip(
+                        selected = vm.histCustom && !is7 && !is30,
+                        onClick = { picker = true },
+                        label = { Text("Custom dates") },
+                    )
+                }
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val ys = if (vm.years.isEmpty()) listOf(vm.histYear) else vm.years
+                    for (y in ys) FilterChip(
+                        selected = !vm.histCustom && y == vm.histYear,
+                        onClick = { vm.loadHistory(year = y) },
+                        label = { Text(y.toString()) },
+                    )
+                }
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(selected = !vm.histCustom && vm.histMonth == 0, onClick = { vm.loadHistory(month = 0) }, label = { Text("Whole year") })
+                    MONTHS.forEachIndexed { i, m ->
+                        FilterChip(selected = !vm.histCustom && vm.histMonth == i + 1, onClick = { vm.loadHistory(month = i + 1) }, label = { Text(m) })
+                    }
+                }
+                val f = vm.histFrom; val t = vm.histTo
+                if (f != null && t != null) {
+                    Text(
+                        f.format(ShortDate) + "  –  " + t.format(ShortDate) + "   (" + (ChronoUnit.DAYS.between(f, t) + 1) + " days)",
+                        color = KC.acc, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
 }
 
 /** Bar chart of one metric: per month for a whole year, otherwise per day. */

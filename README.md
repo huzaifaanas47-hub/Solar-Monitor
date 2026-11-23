@@ -4,10 +4,15 @@ A real Android app (Kotlin + Jetpack Compose), not a WebView. It talks to your e
 PHP server (`proxy.php`, `cron_guard.php`) and draws everything natively.
 
 ## Screens
-- **Live** – battery ring, solar / load / grid / battery power, today's energy, money saved, details, grid and logging status. Refreshes every 30 s while the app is open.
+- **Live** – animated cut-away **house** (marching energy along the cables, shimmering roof panels, glowing window, battery level, grid pylon) with PV / Battery / Load / Grid bubbles, switchable to the node diagram. Inverter readings as animated tiles, plus today's energy, money, power curve and grid / logging status. Refreshes every 30 s while the app is open.
 - **History** – year + month picker, quick 7/30-day ranges and a **custom date range** (`date_from` / `date_to`). Totals with grid import, export and net, highlights, generation / import / export charts, monthly breakdown (whole year), per-day list with battery, peak, cost, savings and CO₂, and **CSV / JSON export** through the share sheet.
 - **Timeline** – 5-minute power and battery charts for any day, grid-down periods shaded red (`action=cron_log`).
 - **Grid** – outage list and summary for today / 7 days / 30 days / this year (`action=grid_events`).
+- **More** – four sub-pages:
+  - **Savings** – today's savings / export income / net profit, breakdown, this month, monthly generation chart and table (`monthly_summary`), **ROI calculator** (payback, 25-year return, paid-back progress), lifetime stats, share today's summary.
+  - **Graphs** – solar vs grid vs home, import vs export and daily solar share for any year / month / custom range, touch to inspect.
+  - **System** – logger and cron status, database health (`db_summary`), editable server settings (`get_settings` / `save_setting`), grid-detection diagnosis (`debug_live_pars`).
+  - **Insights** – tomorrow's estimate (average of recent days), panel check against your best week, solar-share trend, last-60-day stats, live device status and tips.
 - **Settings** – server address, alert switches, buy/sell price, logging status + "Restart logger now", and a button that opens your server's `settings.php` (inverter login) in the browser.
 
 Background (every ~15 min, even when closed): wakes the server cron worker via `cron_guard.php`,
