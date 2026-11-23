@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import com.medicglobe.knoxsolar.AppViewModel
 import com.medicglobe.knoxsolar.BuildConfig
@@ -115,6 +116,16 @@ fun SettingsScreen(vm: AppViewModel) {
                 if (!g.ok) g.lastMessage?.let { Note(it, KC.warn) }
             }
             OutlinedButton(onClick = { vm.loadGuard(true) }, modifier = Modifier.padding(top = 8.dp)) { Text("Restart logger now") }
+        }
+
+        KCard("Inverter readings") {
+            Note("Shows what the inverter reports for the grid. Use it to see why grid voltage or frequency is missing.")
+            OutlinedButton(onClick = { vm.loadDiag() }) { Text(if (vm.diagLoading) "Checking\u2026" else "Check readings") }
+            vm.diag?.let { d ->
+                Text(d.summary, color = KC.text, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
+                d.updatedAt?.let { KV("Reading saved", it) }
+                d.lines.forEach { Text(it, color = KC.mute, fontSize = 12.sp) }
+            }
         }
 
         Note("Knox Solar ${BuildConfig.VERSION_NAME}")

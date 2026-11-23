@@ -19,6 +19,7 @@ class FlowState(t: Today) {
     val soc = t.soc
     val gridUp = t.gridUp != 0
     val outageSec = t.outageSec
+    val liveMissing = t.liveMissing
 
     val solarOn = pv > 0.05
     val battDisch = battKw > 0.05
@@ -61,6 +62,7 @@ class FlowState(t: Today) {
     }
 
     fun battSub(): String = when {
+        liveMissing -> "no reading"
         battDisch -> "giving " + f2(abs(battKw)) + " kW"
         battCharg -> "taking " + f2(abs(battKw)) + " kW"
         else -> "standby"

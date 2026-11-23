@@ -39,7 +39,11 @@ data class Today(
     val costGrid: Double, val savings: Double, val revenue: Double, val co2: Double,
     val peakPv: Double, val peakLoad: Double, val minSoc: Double,
     val outageSince: String?, val outageSec: Long,
+    val battChg: Double, val battDis: Double,             // battery energy today, kWh
 ) {
+    /** The inverter's live readings did not arrive: battery, panels and grid all read empty together. */
+    val liveMissing: Boolean get() = soc <= 0.0 && battV <= 0.0 && pvV <= 0.0 && gridUp == 2
+
     companion object {
         fun from(o: JSONObject) = Today(
             date = o.optString("record_date"), updatedAt = o.s("updated_at"),
@@ -54,6 +58,7 @@ data class Today(
             revenue = o.d("revenue_export"), co2 = o.d("co2_avoided"),
             peakPv = o.d("peak_pv_power"), peakLoad = o.d("peak_load_power"), minSoc = o.d("min_battery_soc"),
             outageSince = o.s("outage_since"), outageSec = o.optLong("outage_sec", 0L),
+            battChg = o.d("battery_charged"), battDis = o.d("battery_discharged"),
         )
     }
 }
@@ -61,12 +66,14 @@ data class Today(
 data class Day(
     val date: String, val gen: Double, val used: Double, val buy: Double, val sell: Double,
     val cost: Double, val savings: Double, val revenue: Double, val co2: Double,
+    val chg: Double = 0.0, val dis: Double = 0.0,
 ) {
     companion object {
         fun from(o: JSONObject) = Day(
             o.optString("record_date"), o.d("energy_today"), o.d("consumed_today"),
             o.d("buy_energy"), o.d("sell_energy"), o.d("cost_grid"),
             o.d("savings_solar"), o.d("revenue_export"), o.d("co2_avoided"),
+            o.d("battery_charged"), o.d("battery_discharged"),
         )
     }
 }
@@ -120,3 +127,6 @@ data class Guard(
         }
     }
 }
+
+/** What the server's inverter check found, for the Settings screen. */
+data class Diag(val updatedAt: String?, val summary: String, val lines: List<String>)

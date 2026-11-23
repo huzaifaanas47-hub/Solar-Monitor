@@ -259,7 +259,7 @@ private fun DrawScope.drawFlow(e: FlowEngine, g: Geo, m: TextMeasurer, sc: Float
             0 -> k2(e.pv) + " kW"
             1 -> k2(e.load) + " kW"
             2 -> if (st.gridUp) k2(abs(e.grid)) + " kW" else "—"
-            else -> k0(e.soc) + "%"
+            else -> if (st.liveMissing) "\u2014" else k0(e.soc) + "%"
         }
         val sub = when (i) {
             0 -> st.solarSub()

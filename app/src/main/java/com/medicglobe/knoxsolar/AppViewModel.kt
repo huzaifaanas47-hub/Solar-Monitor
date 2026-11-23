@@ -91,7 +91,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var histLoading by mutableStateOf(false); private set
     var histError by mutableStateOf<String?>(null); private set
 
+    /** When set, History shows this exact span of days instead of a year or month. */
+    var histRange by mutableStateOf<Pair<LocalDate, LocalDate>?>(null); private set
+
+    fun loadHistoryRange(from: LocalDate, to: LocalDate) = viewModelScope.launch {
+        val a = if (from.isAfter(to)) to else from
+        val b = if (from.isAfter(to)) from else to
+        histRange = a to b
+        histLoading = true
+        val j = get("proxy.php?action=history&date_from=$a&date_to=$b")
+        val arr = j?.optJSONArray("rows")
+        if (arr == null) {
+            histError = "Could not load those dates."
+        } else {
+            histError = null
+            days = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { Day.from(it) }.sortedBy { it.date }
+        }
+        histLoading = false
+    }
+
+    /** Refresh whatever History is showing, a range or a year/month. */
+    fun reloadHistory() {
+        val r = histRange
+        if (r != null) loadHistoryRange(r.first, r.second) else loadHistory()
+    }
+
     fun loadHistory(year: Int = histYear, month: Int = histMonth) = viewModelScope.launch {
+        histRange = null
         histYear = year; histMonth = month
         histLoading = true
         if (years.isEmpty()) {
@@ -165,6 +191,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         gridLoading = false
+    }
+
+    // ── Inverter check (Settings) ──
+    var diag by mutableStateOf<Diag?>(null); private set
+    var diagLoading by mutableStateOf(false); private set
+
+    fun loadDiag() = viewModelScope.launch {
+        diagLoading = true
+        val j = get("proxy.php?action=debug_live_pars")
+        diag = when {
+            j == null -> Diag(null, "Cannot reach the server.", emptyList())
+            j.optInt("err", 0) != 0 -> Diag(null, j.s("desc") ?: "No readings saved yet.", emptyList())
+            else -> {
+                val det = j.optJSONObject("detected")
+                val up = det?.optInt("up", 2) ?: 2
+                val summary = when (up) {
+                    1 -> "Grid is up. " + (det?.s("reason") ?: "")
+                    0 -> "Grid is down. " + (det?.s("reason") ?: "")
+                    else -> "Grid state unknown. " + (det?.s("reason") ?: "")
+                }
+                val likely = j.optJSONObject("likely_grid_related_params")
+                val keys = likely?.keys()?.asSequence()?.toList().orEmpty()
+                Diag(j.s("updated_at"), summary.trim(), keys.map { it + " = " + likely?.optString(it) })
+            }
+        }
+        diagLoading = false
     }
 
     // ── Tariff (Settings) ──
