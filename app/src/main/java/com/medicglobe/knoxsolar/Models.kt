@@ -18,6 +18,10 @@ fun JSONObject.flag(k: String): Boolean = when (val v = opt(k)) {
     else -> false
 }
 
+/** Energy sent to the grid. The server stores it as `sent_to_grid`; `sell_energy` is the legacy name. */
+fun JSONObject.sentKwh(): Double =
+    if (has("sent_to_grid") && !isNull("sent_to_grid")) d("sent_to_grid") else d("sell_energy")
+
 fun f0(v: Double): String = String.format(Locale.US, "%.0f", v)
 fun f1(v: Double): String = String.format(Locale.US, "%.1f", v)
 fun f2(v: Double): String = String.format(Locale.US, "%.2f", v)
@@ -44,7 +48,7 @@ data class Today(
         fun from(o: JSONObject) = Today(
             date = o.optString("record_date"), updatedAt = o.s("updated_at"),
             gen = o.d("energy_today"), used = o.d("consumed_today"),
-            buy = o.d("buy_energy"), sell = o.d("sell_energy"), total = o.d("energy_total"),
+            buy = o.d("buy_energy"), sell = o.sentKwh(), total = o.d("energy_total"),
             pv = o.d("pv_power"), load = o.d("load_power"), grid = o.d("grid_power"),
             soc = o.d("battery_soc"), battKw = o.d("battery_power"),
             battV = o.d("battery_voltage"), gridV = o.d("grid_voltage"), gridHz = o.d("grid_frequency"),
@@ -58,16 +62,32 @@ data class Today(
     }
 }
 
+/**
+ * One saved day from proxy.php?action=history.
+ * Money and CO2 columns are sometimes 0 in old rows, so (like the web dashboard) they are
+ * estimated from the energy figures and the current tariff when the server left them empty.
+ */
 data class Day(
     val date: String, val gen: Double, val used: Double, val buy: Double, val sell: Double,
+    val net: Double, val soc: Double, val peakPv: Double,
     val cost: Double, val savings: Double, val revenue: Double, val co2: Double,
 ) {
     companion object {
-        fun from(o: JSONObject) = Day(
-            o.optString("record_date"), o.d("energy_today"), o.d("consumed_today"),
-            o.d("buy_energy"), o.d("sell_energy"), o.d("cost_grid"),
-            o.d("savings_solar"), o.d("revenue_export"), o.d("co2_avoided"),
-        )
+        fun from(o: JSONObject, buyPrice: Double = 0.0): Day {
+            val gen = o.d("energy_today")
+            val buy = o.d("buy_energy")
+            val sell = o.sentKwh()
+            return Day(
+                date = o.optString("record_date"), gen = gen, used = o.d("consumed_today"),
+                buy = buy, sell = sell,
+                net = if (o.has("net_difference") && !o.isNull("net_difference")) o.d("net_difference") else sell - buy,
+                soc = o.d("battery_soc"), peakPv = o.d("peak_pv_power"),
+                cost = o.d("cost_grid").takeIf { it > 0.0 } ?: Math.round(buy * buyPrice).toDouble(),
+                savings = o.d("savings_solar").takeIf { it > 0.0 } ?: Math.round(gen * buyPrice).toDouble(),
+                revenue = o.d("revenue_export"),
+                co2 = o.d("co2_avoided").takeIf { it > 0.0 } ?: (gen * 0.4),
+            )
+        }
     }
 }
 

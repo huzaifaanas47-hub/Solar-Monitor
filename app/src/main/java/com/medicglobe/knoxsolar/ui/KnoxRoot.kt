@@ -150,7 +150,7 @@ fun KnoxRoot(vm: AppViewModel, tab: Int, onTab: (Int) -> Unit) {
                     IconButton(onClick = {
                         vm.refreshLive()
                         when (tab) {
-                            1 -> vm.loadHistory()
+                            1 -> vm.reloadHistory()
                             2 -> vm.loadTimeline()
                             3 -> vm.loadGrid()
                         }

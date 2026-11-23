@@ -87,12 +87,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var years by mutableStateOf<List<Int>>(emptyList()); private set
     var histYear by mutableStateOf(LocalDate.now().year); private set
     var histMonth by mutableStateOf(0); private set   // 0 = whole year
+    /** Custom date range. Both set = custom mode (year / month chips are ignored). */
+    var histFrom by mutableStateOf<LocalDate?>(null); private set
+    var histTo by mutableStateOf<LocalDate?>(null); private set
+    val histCustom: Boolean get() = histFrom != null && histTo != null
     var days by mutableStateOf<List<Day>>(emptyList()); private set
     var histLoading by mutableStateOf(false); private set
     var histError by mutableStateOf<String?>(null); private set
+    private var histSeq = 0   // only the newest request may write results, so quick taps can't show stale data
 
-    fun loadHistory(year: Int = histYear, month: Int = histMonth) = viewModelScope.launch {
+    fun loadHistory(year: Int = histYear, month: Int = histMonth) {
         histYear = year; histMonth = month
+        histFrom = null; histTo = null
+        fetchHistory("year=$year&month=$month")
+    }
+
+    fun loadRange(from: LocalDate, to: LocalDate) {
+        val today = LocalDate.now()
+        var a = if (from.isAfter(to)) to else from
+        var b = if (from.isAfter(to)) from else to
+        if (b.isAfter(today)) b = today
+        if (a.isAfter(b)) a = b
+        histFrom = a; histTo = b
+        fetchHistory("date_from=$a&date_to=$b")
+    }
+
+    /** Re-fetch whatever is currently selected (used by the refresh button and when the tab opens). */
+    fun reloadHistory() {
+        val f = histFrom; val t = histTo
+        if (f != null && t != null) loadRange(f, t) else loadHistory()
+    }
+
+    /** Short text used in file names and titles: 2026, 2026-11 or 2026-11-01_to_2026-11-20. */
+    fun histLabel(): String {
+        val f = histFrom; val t = histTo
+        return when {
+            f != null && t != null -> "${f}_to_$t"
+            histMonth == 0 -> histYear.toString()
+            else -> "$histYear-${histMonth.toString().padStart(2, '0')}"
+        }
+    }
+
+    private suspend fun ensurePrices() {
+        if (priceBuy.isNotEmpty()) return
+        val j = get("proxy.php?action=get_prices") ?: return
+        priceBuy = trimNum(j.d("buy")); priceSell = trimNum(j.d("sell"))
+    }
+
+    private fun fetchHistory(query: String) = viewModelScope.launch {
+        val mine = ++histSeq
         histLoading = true
         if (years.isEmpty()) {
             val y = get("proxy.php?action=years")?.optJSONArray("years")
@@ -100,13 +143,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 years = (0 until y.length()).mapNotNull { y.opt(it).toString().toIntOrNull() }.sortedDescending()
             }
         }
-        val j = get("proxy.php?action=history&year=$year&month=$month")
+        ensurePrices()
+        val j = get("proxy.php?action=history&$query")
+        if (mine != histSeq) return@launch          // a newer request has taken over
         val arr = j?.optJSONArray("rows")
         if (arr == null) {
             histError = "Could not load history."
+            days = emptyList()
         } else {
             histError = null
-            days = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { Day.from(it) }.sortedBy { it.date }
+            val price = priceBuy.toDoubleOrNull() ?: 0.0
+            days = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+                .map { Day.from(it, price) }.sortedBy { it.date }
         }
         histLoading = false
     }

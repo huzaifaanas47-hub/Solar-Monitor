@@ -5,7 +5,7 @@ PHP server (`proxy.php`, `cron_guard.php`) and draws everything natively.
 
 ## Screens
 - **Live** – battery ring, solar / load / grid / battery power, today's energy, money saved, details, grid and logging status. Refreshes every 30 s while the app is open.
-- **History** – year + month picker, totals, bar chart, per-day list (`action=history`, `years`).
+- **History** – year + month picker, quick 7/30-day ranges and a **custom date range** (`date_from` / `date_to`). Totals with grid import, export and net, highlights, generation / import / export charts, monthly breakdown (whole year), per-day list with battery, peak, cost, savings and CO₂, and **CSV / JSON export** through the share sheet.
 - **Timeline** – 5-minute power and battery charts for any day, grid-down periods shaded red (`action=cron_log`).
 - **Grid** – outage list and summary for today / 7 days / 30 days / this year (`action=grid_events`).
 - **Settings** – server address, alert switches, buy/sell price, logging status + "Restart logger now", and a button that opens your server's `settings.php` (inverter login) in the browser.
